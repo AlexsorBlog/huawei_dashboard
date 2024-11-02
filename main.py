@@ -235,14 +235,14 @@ def fetch_switch_data(host, username, password, refresh_time):
     try:
         connection = create_connection(host, username, password)
         if connection:
-            pass
+            print("CONNECTED")
         else:
             print("-------------\nCONNECTION FAILED")
             print("RETRYING...")
             time.sleep(10)
             connection = create_connection(host, username, password)
             if connection:
-                pass
+                print("CONNECTED")
             else:
                 print("--------------\nRETRY DONT WORK")
                 print("EXIT")
@@ -251,7 +251,6 @@ def fetch_switch_data(host, username, password, refresh_time):
         pass
     while True:
         if connection:
-            print("CONNECTED")
             try:
                 print("PARSING DATA...")
                 brief = execute_command(connection, "display interface brief")
