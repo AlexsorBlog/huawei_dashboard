@@ -129,7 +129,7 @@ def analyze_ports(port_data, detailed):
         detailed_port = detailed_port.split("\n")
 
         # Mark as inactive if both inbound and outbound utilization are very low
-        if in_util is not None and out_util is not None and in_util < 5 and out_util < 5:
+        if in_util is not None and out_util is not None and (in_util < 5 or out_util < 5):
             inactive.append({"port": interface, "issues": ["Port inactive due to low utilization."], "status": "INACTIVE", "detailed": detailed_port})
         elif issues:
             bad.append({"port": interface, "issues": issues, "status": "ISSUE", "detailed": detailed_port})
