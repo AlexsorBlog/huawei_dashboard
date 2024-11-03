@@ -7,6 +7,32 @@ import re
 import configparser
 import logging
 import os
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# Create file handler which logs even debug messages
+fh = logging.FileHandler('app.log')
+fh.setLevel(logging.DEBUG)
+
+# Create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+
+# Create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+
+# Clear existing handlers
+if logger.hasHandlers():
+    logger.handlers.clear()
+
+# Add handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
+
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -129,7 +155,7 @@ def analyze_ports(port_data, detailed):
         detailed_port = detailed_port.split("\n")
 
         # Mark as inactive if both inbound and outbound utilization are very low
-        if in_util is not None and out_util is not None and (in_util < 5 or out_util < 5):
+        if in_util is not None and out_util is not None and ( in_util < 5 or out_util < 5):
             inactive.append({"port": interface, "issues": ["Port inactive due to low utilization."], "status": "INACTIVE", "detailed": detailed_port})
         elif issues:
             bad.append({"port": interface, "issues": issues, "status": "ISSUE", "detailed": detailed_port})
@@ -229,30 +255,32 @@ def parse_transceiver_info(raw_output):
 
     return ports_data
 
+
+
 def fetch_switch_data(host, username, password, refresh_time):
     global port_data, port_stat, data_ready, transceiver_data
-    print("START CONNECTION\n---------------")
+    logger.info("START CONNECTION\n---------------")
     try:
         connection = create_connection(host, username, password)
         if connection:
-            print("CONNECTED")
+            logger.info("CONNECTED")
         else:
-            print("-------------\nCONNECTION FAILED")
-            print("RETRYING...")
+            logger.warning("CONNECTION FAILED\nRETRYING...")
             time.sleep(10)
             connection = create_connection(host, username, password)
             if connection:
-                print("CONNECTED")
+                logger.info("CONNECTED")
             else:
-                print("--------------\nRETRY DONT WORK")
-                print("EXIT")
+                logger.error("RETRY FAILED\nEXITING")
                 os._exit(0)
-    except:
-        pass
+    except Exception as e:
+        logger.exception(f"Exception occurred: {e}")
+        return
+
     while True:
         if connection:
             try:
-                print("PARSING DATA...")
+                logger.info("PARSING DATA...")
                 brief = execute_command(connection, "display interface brief")
                 transceiver_brief = execute_command(connection, "display transceiver")
                 if brief:
@@ -266,13 +294,16 @@ def fetch_switch_data(host, username, password, refresh_time):
                     port_data = good_ports + bad_ports_info + inactive
                     port_stat = [len(good_ports), len(bad_ports_info), len(inactive), len(massive)]
                     data_ready = True  # Data is ready
+                    logger.info("DATA PARSED AND READY")
+                    for port in port_data:
+                        logger.debug(f"Port: {port['port']}, Status: {port['status']}, Issues: {port.get('issues', 'No issues')}, Detailed information: {port.get('detailed')}")
                 else:
-                    print("Commands didnt work")
-                print("DATA PARSED AND DISPLAYED")
-            except:
-                pass
+                    logger.warning("Commands didn't work")
+                logger.info("DATA PARSED AND DISPLAYED")
+            except Exception as e:
+                logger.exception(f"Exception occurred while parsing data: {e}")
         else:
-            print("CONNECTION ERROR")
+            logger.error("CONNECTION ERROR")
 
         time.sleep(refresh_time)
     close_connection(connection)
@@ -306,19 +337,19 @@ def read_config():
 
 if __name__ == '__main__':
     config_data = read_config()
-    print("SETTINGS")
+    logger.info("SETTINGS")
     refresh_time = config_data["General"]["refresh_delay"]
-    print("REFRESH DELAY: " + str(refresh_time))
+    logger.info(f"REFRESH DELAY: {refresh_time}")
     host = config_data["General"]["host"]
-    print("HOST/IP: " + str(host))
+    logger.info(f"HOST/IP: {host}")
     username = config_data["General"]["login"]
-    print("USERNAME/LOGIN: " + str(username))
+    logger.info(f"USERNAME/LOGIN: {username}")
     password = config_data["General"]["password"]
-    print("PASSWORD: " + str(password))
+    logger.info(f"PASSWORD: {password}")
     threading.Thread(target=fetch_switch_data, daemon=True, args=(host, username, password, int(refresh_time))).start()
     local_host = config_data["General"]["local_host"]
     local_port = config_data["General"]["local_port"]
-    print("-------------")
-    print(f"PROGRAM RUNNING IN http://{local_host}:{local_port}/")
-    print("-------------")
+    logger.info("-------------")
+    logger.info(f"PROGRAM RUNNING IN http://{local_host}:{local_port}/")
+    logger.info("-------------")
     app.run(host=local_host, port=int(local_port))
